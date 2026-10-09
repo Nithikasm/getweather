@@ -30,9 +30,12 @@ tools = [
     )
 ]
 
+import time
 
 def main():
     user_input = input("What would you like to know? ")
+
+    start = time.perf_counter()
 
     response = client.models.generate_content(
         model="gemini-3.8-flash",
@@ -40,14 +43,25 @@ def main():
         config=types.GenerateContentConfig(tools=tools)
     )
 
+    print(f"\nGemini first call: {time.perf_counter() - start:.2f}s")
+
     for part in response.candidates[0].content.parts:
         if part.function_call:
             function_call = part.function_call
 
             if function_call.name == "get_current_weather":
+                weather_start = time.perf_counter()
+
                 result = get_current_weather(
                     function_call.args["city_name"]
                 )
+
+                print(
+                    f"WeatherAPI call: "
+                    f"{time.perf_counter() - weather_start:.2f}s"
+                )
+
+                final_start = time.perf_counter()
 
                 final_response = client.models.generate_content(
                     model="gemini-3.8-flash",
@@ -70,7 +84,11 @@ def main():
                     config=types.GenerateContentConfig(tools=tools)
                 )
 
-                print(final_response.text)
+                print(
+                    f"Gemini final call: "
+                    f"{time.perf_counter() - final_start:.2f}s"
+                )
+                print(f"\n{final_response.text}")
                 return
 
     print(response.text)
