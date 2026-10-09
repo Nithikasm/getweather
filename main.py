@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from weather import get_current_weather
+from google.genai import errors
 
 load_dotenv()
 
@@ -30,39 +31,32 @@ tools = [
     )
 ]
 
-import time
-
 def main():
     user_input = input("What would you like to know? ")
 
-    start = time.perf_counter()
-
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=user_input,
-        config=types.GenerateContentConfig(tools=tools)
-    )
-
-    print(f"\nGemini first call: {time.perf_counter() - start:.2f}s")
+    try:
+        response = client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=user_input,
+                config=types.GenerateContentConfig(tools=tools)
+            )
+    except errors.ServerError as err:
+            if err.code == 503:
+                print("Gemini is temporarily busy. Please try again in a moment.")
+            else:
+                print(f"Gemini server error: {err.code}")
+            return
 
     for part in response.candidates[0].content.parts:
         if part.function_call:
             function_call = part.function_call
 
             if function_call.name == "get_current_weather":
-                weather_start = time.perf_counter()
 
                 result = get_current_weather(
                     function_call.args["city_name"]
                 )
-
-                print(
-                    f"WeatherAPI call: "
-                    f"{time.perf_counter() - weather_start:.2f}s"
-                )
-
-                final_start = time.perf_counter()
-
+            try:
                 final_response = client.models.generate_content(
                     model="gemini-3.8-flash",
                     contents=[
@@ -83,13 +77,15 @@ def main():
                     ],
                     config=types.GenerateContentConfig(tools=tools)
                 )
-
-                print(
-                    f"Gemini final call: "
-                    f"{time.perf_counter() - final_start:.2f}s"
-                )
-                print(f"\n{final_response.text}")
+            except:
+                if err.code == 503:
+                    print("Gemini is temporarily busy. Your weather data was retrieved, but the final answer could not be generated. Please try again.")
+                else:
+                    print(f"Gemini server error: {err.code}")
                 return
+            
+            print(f"\n{final_response.text}")
+            return
 
     print(response.text)
 

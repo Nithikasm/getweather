@@ -3,8 +3,6 @@ import requests
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
-print("API key loaded:", bool(os.getenv("WEATHER_API_KEY")))
-print("API key preview:", os.getenv("WEATHER_API_KEY", "")[:4])
 
 API_KEY = os.getenv("WEATHER_API_KEY")
 
