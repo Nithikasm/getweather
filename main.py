@@ -8,7 +8,7 @@ from google.genai import errors
 
 load_dotenv()
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"),http_options=types.HttpOptions(timeout=30000))
 
 tools = [
     types.Tool(
