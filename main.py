@@ -8,6 +8,24 @@ from google.genai import errors
 
 load_dotenv()
 
+
+def validate_city_name(city_name):
+    """Check whether the city name is usable before calling the weather API."""
+
+    if not isinstance(city_name, str):
+        raise ValueError("City name must be a string.")
+
+    city_name = city_name.strip()
+
+    if not city_name:
+        raise ValueError("City name cannot be empty.")
+
+    if len(city_name) > 100:
+        raise ValueError("City name is too long.")
+
+    return city_name
+
+
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"),http_options=types.HttpOptions(timeout=30000))
 
 tools = [
@@ -61,11 +79,32 @@ def main():
         if part.function_call:
             function_call = part.function_call
 
-            if function_call.name == "get_current_weather":
+            
+            def execute_weather_tool(function_call):
+                """Validate and safely execute the requested weather tool."""
 
-                result = get_current_weather(
-                    function_call.args["city_name"]
+                if function_call.name != "get_current_weather":
+                    raise ValueError(
+                        f"Unknown tool: {function_call.name}"
+                    )
+
+                args = function_call.args or {}
+
+                if not isinstance(args, dict):
+                    raise ValueError("Tool arguments must be an object.")
+
+                city_name = validate_city_name(
+                    args.get("city_name")
                 )
+
+                return get_current_weather(city_name)
+            try:
+                result = execute_weather_tool(function_call)
+            except ValueError as err:
+                result = {"error": str(err)}
+            except Exception:
+                result = {"error": "Weather lookup failed."}
+
             try:
                 final_response = client.models.generate_content(
                     model="gemini-3.8-flash",
@@ -105,3 +144,18 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+     
+test_inputs = [
+    "Udupi",
+    "  Bengaluru  ",
+    "",
+    "   ",
+    123,
+]
+
+for value in test_inputs:
+    try:
+        print(repr(value), "->", validate_city_name(value))
+    except ValueError as err:
+        print(repr(value), "-> REJECTED:", err)
